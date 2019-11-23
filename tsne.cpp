@@ -52,7 +52,7 @@ static double randn();
 static void computeExactGradient(double* P, double* Y, int N, int D, double* dC);
 static void computeGradient(unsigned int* inp_row_P, unsigned int* inp_col_P, double* inp_val_P, double* Y, int N, int D, double* dC, double theta);
 static double evaluateError(double* P, double* Y, int N, int D);
-static double evaluateError(unsigned int* row_P, unsigned int* col_P, double* val_P, double* Y, int N, int D, double theta);
+static double evaluateError(unsigned int* row_P, unsigned int* col_P, double* val_P, double* Y, int N, int D, double theta, bool save_cost_per_point = false);
 static void computeSquaredEuclideanDistance(double* X, int N, int D, double* DD);
 static void symmetrizeMatrix(unsigned int** row_P, unsigned int** col_P, double** val_P, int N);
 static void save_1D_array(double* array, int n, const char* filename);
@@ -197,6 +197,8 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
     }
     end = clock(); total_time += (float) (end - start) / CLOCKS_PER_SEC;
 
+    evaluateError(row_P, col_P, val_P, Y, N, no_dims, theta, true);
+
     // Clean up memory
     free(dY);
     free(uY);
@@ -322,7 +324,7 @@ static double evaluateError(double* P, double* Y, int N, int D) {
 }
 
 // Evaluate t-SNE cost function (approximately)
-static double evaluateError(unsigned int* row_P, unsigned int* col_P, double* val_P, double* Y, int N, int D, double theta)
+static double evaluateError(unsigned int* row_P, unsigned int* col_P, double* val_P, double* Y, int N, int D, double theta, bool save_cost_per_point)
 {
 
     // Get estimate of normalization term
@@ -330,11 +332,13 @@ static double evaluateError(unsigned int* row_P, unsigned int* col_P, double* va
     double* buff = (double*) calloc(D, sizeof(double));
     double sum_Q = .0;
     for(int n = 0; n < N; n++) tree->computeNonEdgeForces(n, theta, buff, &sum_Q);
+    double* cost_per_point = new double[N];
 
     // Loop over all edges to compute t-SNE error
     int ind1, ind2;
-    double C = .0, Q;
+    double C = .0, Q, c;
     for(int n = 0; n < N; n++) {
+        cost_per_point[n] = .0;
         ind1 = n * D;
         for(int i = row_P[n]; i < row_P[n + 1]; i++) {
             Q = .0;
@@ -343,13 +347,19 @@ static double evaluateError(unsigned int* row_P, unsigned int* col_P, double* va
             for(int d = 0; d < D; d++) buff[d] -= Y[ind2 + d];
             for(int d = 0; d < D; d++) Q += buff[d] * buff[d];
             Q = (1.0 / (1.0 + Q)) / sum_Q;
-            C += val_P[i] * log((val_P[i] + FLT_MIN) / (Q + FLT_MIN));
+            c = val_P[i] * log((val_P[i] + FLT_MIN) / (Q + FLT_MIN));
+            cost_per_point[n] += c;
+            C += c;
         }
     }
+
+    if (save_cost_per_point)
+        save_1D_array(cost_per_point, N, "cost_per_point.txt");
 
     // Clean up memory
     free(buff);
     delete tree;
+    delete[] cost_per_point;
     return C;
 }
 

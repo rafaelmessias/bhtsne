@@ -173,7 +173,9 @@ def bh_tsne(workdir, verbose=False):
         # The last piece of data is the cost for each sample, we ignore it
         #read_unpack('{}d'.format(sample_count), output_file)
 
-def run_bh_tsne(data, no_dims=2, perplexity=50, theta=0.5, randseed=-1, verbose=False, initial_dims=50, use_pca=True, max_iter=1000, return_betas=False):
+def run_bh_tsne(data, no_dims=2, perplexity=50, theta=0.5, randseed=-1,
+        verbose=False, initial_dims=50, use_pca=True, max_iter=1000,
+        return_betas=False, return_cost_per_point=False):
     '''
     Run TSNE based on the Barnes-HT algorithm
 
@@ -222,6 +224,10 @@ def run_bh_tsne(data, no_dims=2, perplexity=50, theta=0.5, randseed=-1, verbose=
         if return_betas:
             betas = np.loadtxt(path_join(tmp_dir_path, 'betas.txt'))
             ret = (ret, betas)
+
+        if return_cost_per_point:
+            cpp = np.loadtxt(path_join(tmp_dir_path, 'cost_per_point.txt'))
+            ret = (*ret, cpp)
 
         rmtree(tmp_dir_path)
         return ret
