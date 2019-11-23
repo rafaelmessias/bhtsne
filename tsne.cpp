@@ -55,6 +55,7 @@ static double evaluateError(double* P, double* Y, int N, int D);
 static double evaluateError(unsigned int* row_P, unsigned int* col_P, double* val_P, double* Y, int N, int D, double theta);
 static void computeSquaredEuclideanDistance(double* X, int N, int D, double* DD);
 static void symmetrizeMatrix(unsigned int** row_P, unsigned int** col_P, double** val_P, int N);
+static void save_1D_array(double* array, int n, const char* filename);
 
 // Perform t-SNE
 void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexity, double theta, int rand_seed,
@@ -452,6 +453,7 @@ static void computeGaussianPerplexity(double* X, int N, int D, unsigned int** _r
     printf("Building tree...\n");
     vector<DataPoint> indices;
     vector<double> distances;
+    double* betas = new double[N];
     for(int n = 0; n < N; n++) {
 
         if(n % 10000 == 0) printf(" - point %d of %d\n", n, N);
@@ -508,6 +510,9 @@ static void computeGaussianPerplexity(double* X, int N, int D, unsigned int** _r
             iter++;
         }
 
+        // Save the found beta to a vector of all betas
+        betas[n] = beta;
+
         // Row-normalize current row of P and store in matrix
         for(unsigned int m = 0; m < K; m++) cur_P[m] /= sum_P;
         for(unsigned int m = 0; m < K; m++) {
@@ -516,10 +521,14 @@ static void computeGaussianPerplexity(double* X, int N, int D, unsigned int** _r
         }
     }
 
+    // Save the betas to disk, so we can recover them later
+    save_1D_array(betas, N, "betas.txt");
+
     // Clean up memory
     obj_X.clear();
     free(cur_P);
     delete tree;
+    delete[] betas;
 }
 
 
@@ -714,4 +723,20 @@ void TSNE::save_data(double* data, int* landmarks, double* costs, int n, int d) 
     fwrite(costs, sizeof(double), n, h);
     fclose(h);
 	printf("Wrote the %i x %i data matrix successfully!\n", n, d);
+}
+
+// Function that saves a 1D array in the numpy.savetxt format
+void save_1D_array(double* array, int n, const char* filename) {
+
+    // Open file, write first 2 integers and then the data
+	FILE *h;
+	if((h = fopen(filename, "w")) == NULL) {
+		printf("Error: could not open [%s] for writing.\n", filename);
+		return;
+	}
+	//fprintf(h, "%d\n", n);
+    for (int i = 0; i < n; ++i)
+        fprintf(h, "%f\n", array[i]);
+    fclose(h);
+	printf("Wrote [%s] successfully, with %i rows!\n", filename, n);
 }
