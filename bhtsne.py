@@ -175,7 +175,7 @@ def bh_tsne(workdir, verbose=False):
 
 def run_bh_tsne(data, no_dims=2, perplexity=50, theta=0.5, randseed=-1,
         verbose=False, initial_dims=50, use_pca=True, max_iter=1000,
-        return_betas=False, return_cost_per_point=False):
+        return_betas=False, return_cost_per_point=False, return_cost_per_iter=False):
     '''
     Run TSNE based on the Barnes-HT algorithm
 
@@ -228,6 +228,10 @@ def run_bh_tsne(data, no_dims=2, perplexity=50, theta=0.5, randseed=-1,
         if return_cost_per_point:
             cpp = np.loadtxt(path_join(tmp_dir_path, 'cost_per_point.txt'))
             ret = (*ret, cpp)
+
+        if return_cost_per_iter:
+            cpi = np.loadtxt(path_join(tmp_dir_path, 'cost_per_iter.txt'))
+            ret = (*ret, cpi)
 
         rmtree(tmp_dir_path)
         return ret

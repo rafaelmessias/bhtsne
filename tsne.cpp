@@ -59,7 +59,7 @@ static void save_1D_array(double* array, int n, const char* filename);
 
 // Perform t-SNE
 void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexity, double theta, int rand_seed,
-               bool skip_random_init, int max_iter, int stop_lying_iter, int mom_switch_iter) {
+               bool skip_random_init, int max_iter, int stop_lying_iter, int mom_switch_iter, int cost_iter_step) {
 
     // Set random seed
     if (skip_random_init != true) {
@@ -147,14 +147,16 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
     else {      for(int i = 0; i < row_P[N]; i++) val_P[i] *= 12.0; }
 
 	// Initialize solution (randomly)
-  if (skip_random_init != true) {
-  	for(int i = 0; i < N * no_dims; i++) Y[i] = randn() * .0001;
-  }
+    if (skip_random_init != true) {
+        for(int i = 0; i < N * no_dims; i++) Y[i] = randn() * .0001;
+    }
 
 	// Perform main training loop
     if(exact) printf("Input similarities computed in %4.2f seconds!\nLearning embedding...\n", (float) (end - start) / CLOCKS_PER_SEC);
     else printf("Input similarities computed in %4.2f seconds (sparsity = %f)!\nLearning embedding...\n", (float) (end - start) / CLOCKS_PER_SEC, (double) row_P[N] / ((double) N * (double) N));
     start = clock();
+
+    double* cost_per_iter = new double[max_iter];
 
 	for(int iter = 0; iter < max_iter; iter++) {
 
@@ -181,22 +183,27 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
         if(iter == mom_switch_iter) momentum = final_momentum;
 
         // Print out progress
-        if (iter > 0 && (iter % 50 == 0 || iter == max_iter - 1)) {
+        if (iter % cost_iter_step == 0 || iter == max_iter - 1) {
             end = clock();
             double C = .0;
             if(exact) C = evaluateError(P, Y, N, no_dims);
             else      C = evaluateError(row_P, col_P, val_P, Y, N, no_dims, theta);  // doing approximate computation here!
             if(iter == 0)
-                printf("Iteration %d: error is %f\n", iter + 1, C);
+                printf("Iteration %d: error is %f\n", iter, C);
             else {
                 total_time += (float) (end - start) / CLOCKS_PER_SEC;
-                printf("Iteration %d: error is %f (50 iterations in %4.2f seconds)\n", iter, C, (float) (end - start) / CLOCKS_PER_SEC);
+                printf("Iteration %d: error is %f (%d iterations in %4.2f seconds)\n", iter, C, cost_iter_step, (float) (end - start) / CLOCKS_PER_SEC);
             }
+            cost_per_iter[iter] = C;
 			start = clock();
         }
     }
     end = clock(); total_time += (float) (end - start) / CLOCKS_PER_SEC;
 
+    // Save the cost per iteration to file
+    save_1D_array(cost_per_iter, max_iter, "cost_per_iter.txt");
+
+    // This time it's for saving the final cost per point
     evaluateError(row_P, col_P, val_P, Y, N, no_dims, theta, true);
 
     // Clean up memory
@@ -209,6 +216,7 @@ void TSNE::run(double* X, int N, int D, double* Y, int no_dims, double perplexit
         free(col_P); col_P = NULL;
         free(val_P); val_P = NULL;
     }
+    delete[] cost_per_iter;
     printf("Fitting performed in %4.2f seconds.\n", total_time);
 }
 
